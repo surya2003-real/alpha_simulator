@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AlphaSim — Quantitative Backtest Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:       #0a0b0d;
+  --surface:  #111316;
+  --surface2: #181b1f;
+  --border:   rgba(255,255,255,0.07);
+  --border2:  rgba(255,255,255,0.13);
+  --text:     #e8e6e0;
+  --muted:    #7a7870;
+  --accent:   #c8f060;
+  --accent2:  #60c8f0;
+  --red:      #f06060;
+  --amber:    #f0b860;
+  --mono:     'DM Mono', monospace;
+  --sans:     'DM Sans', sans-serif;
+  --display:  'Syne', sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* ── Layout ── */
+#app{display:grid;grid-template-columns:280px 1fr;grid-template-rows:52px 1fr;height:100vh}
+#topbar{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid var(--border);background:var(--surface)}
+#sidebar{background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column}
+#main{display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+
+/* ── Topbar ── */
+.logo{font-family:var(--display);font-size:17px;font-weight:700;letter-spacing:-.3px;color:var(--text)}
+.logo span{color:var(--accent)}
+.nav{display:flex;gap:2px}
+.nav-btn{padding:5px 13px;border-radius:6px;border:none;background:none;color:var(--muted);font-family:var(--sans);font-size:12px;cursor:pointer;transition:all .15s}
+.nav-btn:hover{color:var(--text);background:var(--surface2)}
+.nav-btn.active{color:var(--bg);background:var(--accent);font-weight:500}
+.run-btn{display:flex;align-items:center;gap:7px;padding:7px 18px;background:var(--accent);color:var(--bg);border:none;border-radius:7px;font-family:var(--display);font-size:12px;font-weight:600;cursor:pointer;letter-spacing:.3px;transition:all .15s}
+.run-btn:hover{filter:brightness(1.1)}
+.run-btn:disabled{opacity:.5;cursor:not-allowed}
+.run-btn .spinner{width:12px;height:12px;border:2px solid rgba(0,0,0,.3);border-top-color:#000;border-radius:50%;animation:spin .6s linear infinite;display:none}
+.run-btn.loading .spinner{display:block}
+.run-btn.loading .btn-label{display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.status-badge{font-family:var(--mono);font-size:10px;color:var(--muted);padding:3px 8px;border:1px solid var(--border);border-radius:4px}
+
+/* ── Sidebar sections ── */
+.sb-section{padding:14px 16px;border-bottom:1px solid var(--border)}
+.sb-title{font-family:var(--display);font-size:10px;font-weight:600;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+.sb-title button{font-size:10px;color:var(--accent);background:none;border:none;cursor:pointer;font-family:var(--mono)}
+
+/* Factor list */
+.factor-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin-bottom:6px;position:relative}
+.factor-card .fc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.factor-card .fc-name{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--text)}
+.factor-card .fc-dir{font-size:10px;padding:2px 6px;border-radius:3px;font-family:var(--mono)}
+.dir-long{background:rgba(200,240,96,.15);color:var(--accent)}
+.dir-short{background:rgba(240,96,96,.15);color:var(--red)}
+.fc-weight-row{display:flex;align-items:center;gap:8px}
+.fc-weight-row input[type=range]{flex:1;-webkit-appearance:none;height:3px;border-radius:2px;background:var(--border2);outline:none}
+.fc-weight-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--accent);cursor:pointer}
+.fc-weight-pct{font-family:var(--mono);font-size:10px;color:var(--accent);min-width:28px;text-align:right}
+.fc-del{position:absolute;top:7px;right:36px;width:16px;height:16px;border:none;background:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;border-radius:3px}
+.fc-del:hover{color:var(--red)}
+.fc-toggle{position:absolute;top:7px;right:10px;font-size:10px;cursor:pointer;color:var(--muted)}
+
+.add-factor-btn{width:100%;padding:7px;border:1px dashed var(--border2);border-radius:7px;background:none;color:var(--muted);font-family:var(--mono);font-size:11px;cursor:pointer;transition:all .15s}
+.add-factor-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* Select / Input */
+.sb-row{margin-bottom:8px}
+.sb-label{font-size:10px;color:var(--muted);margin-bottom:3px;font-family:var(--mono)}
+.sb-select,.sb-input{width:100%;padding:6px 9px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:11px;outline:none;transition:border .15s}
+.sb-select:focus,.sb-input:focus{border-color:var(--accent)}
+.sb-select option{background:var(--surface2)}
+.sb-2col{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+
+/* Tags */
+.tag-grid{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:2px}
+.tag{padding:3px 8px;border-radius:4px;border:1px solid var(--border);color:var(--muted);font-size:10px;font-family:var(--mono);cursor:pointer;transition:all .15s;user-select:none}
+.tag.on{background:rgba(200,240,96,.12);border-color:var(--accent);color:var(--accent)}
+
+/* ── Metric bar ── */
+#metric-bar{display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--border);flex-shrink:0}
+.metric-cell{padding:10px 14px;border-right:1px solid var(--border);cursor:default}
+.metric-cell:last-child{border-right:none}
+.mv{font-family:var(--mono);font-size:16px;font-weight:500;line-height:1.15}
+.ml{font-size:9px;color:var(--muted);margin-top:2px;font-family:var(--mono);letter-spacing:.3px}
+.mv.pos{color:var(--accent)}
+.mv.neg{color:var(--red)}
+.mv.neu{color:var(--text)}
+.mv.placeholder{color:var(--muted)}
+
+/* ── Tabs / panels ── */
+#tab-bar{display:flex;border-bottom:1px solid var(--border);padding:0 16px;background:var(--surface);flex-shrink:0}
+.tab{padding:8px 14px;font-size:11px;font-family:var(--mono);color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+#panels{flex:1;overflow:hidden;position:relative}
+.panel{position:absolute;inset:0;overflow-y:auto;padding:16px;display:none}
+.panel.active{display:block}
+
+/* ── Chart cards ── */
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px}
+.cc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.cc-title{font-family:var(--display);font-size:12px;font-weight:600;color:var(--text);letter-spacing:.2px}
+.cc-pills{display:flex;gap:4px}
+.cc-pill{padding:2px 8px;border-radius:4px;font-size:10px;font-family:var(--mono);border:1px solid var(--border);color:var(--muted);cursor:pointer;transition:all .15s}
+.cc-pill.on{background:var(--surface2);color:var(--text);border-color:var(--border2)}
+.chart-wrap{position:relative}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:900px){.two-col{grid-template-columns:1fr}}
+
+/* ── Stats table ── */
+.stats-table{width:100%}
+.stats-table tr{border-bottom:1px solid var(--border)}
+.stats-table tr:last-child{border:none}
+.stats-table td{padding:5px 0;font-size:11px}
+.stats-table .sk{color:var(--muted);font-family:var(--mono)}
+.stats-table .sv{text-align:right;font-family:var(--mono);font-weight:500}
+.sv.pos{color:var(--accent)}
+.sv.neg{color:var(--red)}
+.sv.neu{color:var(--text)}
+
+/* ── Heatmap ── */
+#heatmap-container{overflow-x:auto}
+.heatmap{display:grid;gap:2px}
+.hm-row{display:flex;gap:2px;align-items:center}
+.hm-cell{width:36px;height:22px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;cursor:default;transition:transform .1s}
+.hm-cell:hover{transform:scale(1.15);z-index:2}
+.hm-year{width:36px;font-family:var(--mono);font-size:9px;color:var(--muted);text-align:right;padding-right:6px;flex-shrink:0}
+.hm-mon-label{width:36px;text-align:center;font-family:var(--mono);font-size:9px;color:var(--muted)}
+
+/* ── Trade log ── */
+.trade-table{width:100%;border-collapse:collapse}
+.trade-table th{font-family:var(--mono);font-size:9px;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);letter-spacing:.5px;text-transform:uppercase;font-weight:500;position:sticky;top:0;background:var(--bg)}
+.trade-table td{font-family:var(--mono);font-size:10px;padding:5px 8px;border-bottom:1px solid var(--border)}
+.trade-table tr:hover td{background:var(--surface)}
+.pill-buy{padding:1px 6px;background:rgba(200,240,96,.15);color:var(--accent);border-radius:3px;font-size:9px}
+.pill-sell{padding:1px 6px;background:rgba(240,96,96,.15);color:var(--red);border-radius:3px;font-size:9px}
+
+/* ── Empty state ── */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;color:var(--muted)}
+.empty-icon{font-size:32px;opacity:.3}
+.empty-text{font-family:var(--mono);font-size:11px}
+
+/* ── Factor modal ── */
+#factor-modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:100}
+#factor-modal.open{display:flex}
+.modal-box{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:20px;width:340px;max-height:80vh;overflow-y:auto}
+.modal-title{font-family:var(--display);font-size:14px;font-weight:600;margin-bottom:14px}
+.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.factor-option{padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;cursor:pointer;transition:all .15s}
+.factor-option:hover{border-color:var(--accent)}
+.factor-option .fo-name{font-family:var(--mono);font-size:11px;font-weight:500}
+.factor-option .fo-dir{font-size:9px;color:var(--muted);margin-top:2px}
+.modal-close{float:right;background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1}
+
+/* ── Loading overlay ── */
+#loading-overlay{position:fixed;inset:0;background:rgba(10,11,13,.85);display:none;align-items:center;justify-content:center;z-index:200;flex-direction:column;gap:14px}
+#loading-overlay.show{display:flex}
+.ld-text{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.ld-bar{width:220px;height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+.ld-fill{height:100%;background:var(--accent);border-radius:2px;animation:ldpulse 1.5s ease-in-out infinite}
+@keyframes ldpulse{0%{width:0%}50%{width:80%}100%{width:100%}}
+
+/* Factor exposure chart */
+#factor-panel .chart-card{margin-bottom:14px}
+
+/* Annual bar chart */
+.annual-bar-wrap{display:flex;gap:4px;align-items:flex-end;height:120px;padding:0 4px}
+.ab-group{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1}
+.ab-bar-wrap{display:flex;gap:1px;align-items:flex-end;height:100px}
+.ab-bar{width:14px;border-radius:2px 2px 0 0;min-height:2px;transition:height .3s}
+.ab-year{font-family:var(--mono);font-size:8px;color:var(--muted);margin-top:3px}
+
+/* Add to your CSS block */
+.factors-disabled {
+  opacity: 0.3;
+  pointer-events: none;
+  transition: opacity 0.2s ease-in-out;
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ── Top Bar ── -->
+  <div id="topbar">
+    <div style="display:flex;align-items:center;gap:20px">
+      <div class="logo">Alpha<span>Sim</span></div>
+      <div class="nav">
+        <button class="nav-btn active" onclick="showPage('strategy')">Strategy</button>
+        <button class="nav-btn" onclick="showPage('universe')">Universe</button>
+        <button class="nav-btn" onclick="showPage('portfolio')">Portfolio</button>
+        <button class="nav-btn" onclick="showPage('risk')">Risk</button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="status-badge" id="status-badge">Ready</div>
+      <button class="run-btn" id="run-btn" onclick="runBacktest()">
+        <div class="spinner"></div>
+        <span class="btn-label">▶ Run Backtest</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Sidebar ── -->
+  <div id="sidebar">
+
+    <!-- Date range -->
+    <div class="sb-section">
+      <div class="sb-title">Date Range</div>
+      <div class="sb-2col">
+        <div class="sb-row">
+          <div class="sb-label">Start</div>
+          <input class="sb-input" id="start-date" type="date" value="2004-01-01">
+        </div>
+        <div class="sb-row">
+          <div class="sb-label">End</div>
+          <input class="sb-input" id="end-date" type="date" value="2018-12-31">
+        </div>
+      </div>
+    </div>
+
+    <!-- Alpha factors (strategy page) -->
+    <div class="sb-section" id="sb-strategy">
+      <div class="sb-title">Custom Alpha</div>
+      <div class="sb-row">
+        <div class="sb-label">Formula (pandas.eval) you can use terms like returns_lag1, price, momentum_1m, momentum_6m, momentum_12m, rsi_14, volatility_20d</div>
+        <textarea class="sb-input" id="custom-alpha" rows="3" 
+                  placeholder="e.g., momentum_1m * 0.6 + rsi_14 * 0.4" 
+                  oninput="toggleFactorState()"></textarea>
+        <div class="sb-label" style="margin-top:4px; font-size:9px;">Overrides factor weights below if provided.</div>
+      </div>
+
+      <div id="factor-ui-wrapper">
+        <div class="sb-title" style="margin-top: 20px;">
+          Alpha Factors
+          <button onclick="openFactorModal()">+ Add</button>
+        </div>
+        <div id="factor-list"></div>
+      </div>
+    </div>
+
+    <!-- Universe filters (universe page) -->
+    <div class="sb-section" id="sb-universe" style="display:none">
+      <div class="sb-title">Sectors</div>
+      <div class="tag-grid" id="sector-tags"></div>
+    </div>
+    <div class="sb-section" id="sb-universe2" style="display:none">
+      <div class="sb-title">Market Cap</div>
+      <div class="tag-grid" id="cap-tags"></div>
+      <div class="sb-row" style="margin-top:8px">
+        <div class="sb-label">Min Avg Daily Volume ($)</div>
+        <input class="sb-input" id="min-adv" type="number" value="0" step="1000000">
+      </div>
+    </div>
+
+    <!-- Portfolio settings (portfolio page) -->
+    <div class="sb-section" id="sb-portfolio" style="display:none">
+      <div class="sb-title">Construction</div>
+      <div class="sb-row">
+        <div class="sb-label">Weighting</div>
+        <select class="sb-select" id="weighting">
+          <option value="equal">Equal weight</option>
+          <option value="signal">Signal weight</option>
+          <option value="market_cap">Market cap weight</option>
+        </select>
+      </div>
+      <div class="sb-2col">
+        <div class="sb-row">
+          <div class="sb-label">Max positions</div>
+          <input class="sb-input" id="max-pos" type="number" value="50" min="5" max="500">
+        </div>
+        <div class="sb-row">
+          <div class="sb-label">Max weight %</div>
+          <input class="sb-input" id="max-wt" type="number" value="5" min="1" max="100" step="0.5">
+        </div>
+      </div>
+      <div class="sb-row">
+        <div class="sb-label">Rebalance frequency</div>
+        <select class="sb-select" id="rebal-freq">
+          <option value="M">Monthly</option>
+          <option value="W">Weekly</option>
+          <option value="Q">Quarterly</option>
+        </select>
+      </div>
+      <div class="sb-row">
+        <div class="sb-label">Benchmark</div>
+        <select class="sb-select" id="benchmark">
+          <option value="SP500">S&amp;P 500</option>
+        </select>
+      </div>
+      <div class="sb-row">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="long-short" style="accent-color:var(--accent)">
+          <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">Long / Short mode</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Risk (risk page) -->
+    <div class="sb-section" id="sb-risk" style="display:none">
+      <div class="sb-title">Transaction Costs</div>
+      <div class="sb-2col">
+        <div class="sb-row">
+          <div class="sb-label">Slippage (bps)</div>
+          <input class="sb-input" id="slippage" type="number" value="10" min="0" max="100">
+        </div>
+        <div class="sb-row">
+          <div class="sb-label">Commission (bps)</div>
+          <input class="sb-input" id="commission" type="number" value="5" min="0" max="50">
+        </div>
+      </div>
+      <div class="sb-title" style="margin-top:8px">Circuit Breakers</div>
+      <div class="sb-row">
+        <div class="sb-label">Max drawdown stop (%)</div>
+        <input class="sb-input" id="max-dd-stop" type="number" value="20" min="5" max="100">
+      </div>
+    </div>
+
+  </div><!-- /sidebar -->
+
+  <!-- ── Main ── -->
+  <div id="main">
+
+    <!-- Metric bar -->
+    <div id="metric-bar">
+      <div class="metric-cell"><div class="mv placeholder" id="m-cagr">—</div><div class="ml">CAGR</div></div>
+      <div class="metric-cell"><div class="mv placeholder" id="m-sharpe">—</div><div class="ml">Sharpe</div></div>
+      <div class="metric-cell"><div class="mv placeholder" id="m-sortino">—</div><div class="ml">Sortino</div></div>
+      <div class="metric-cell"><div class="mv placeholder" id="m-mdd">—</div><div class="ml">Max Drawdown</div></div>
+      <div class="metric-cell"><div class="mv placeholder" id="m-alpha">—</div><div class="ml">Alpha vs Bmk</div></div>
+      <div class="metric-cell"><div class="mv placeholder" id="m-beta">—</div><div class="ml">Beta</div></div>
+      <div class="metric-cell"><div class="mv placeholder" id="m-vol">—</div><div class="ml">Ann. Volatility</div></div>
+    </div>
+
+    <!-- Tab bar -->
+    <div id="tab-bar">
+      <div class="tab active" onclick="showTab('charts')">Charts</div>
+      <div class="tab" onclick="showTab('metrics')">Metrics</div>
+      <div class="tab" onclick="showTab('heatmap')">Heatmap</div>
+      <div class="tab" onclick="showTab('factor')">Factor Exposure</div>
+      <div class="tab" onclick="showTab('trades')">Trade Log</div>
+    </div>
+
+    <!-- Panels -->
+    <div id="panels">
+
+      <!-- Charts panel -->
+      <div class="panel active" id="panel-charts">
+        <div id="no-results" class="empty" style="height:calc(100vh - 200px)">
+          <div class="empty-icon">◎</div>
+          <div class="empty-text">Configure a strategy and run backtest to see results</div>
+        </div>
+        <div id="chart-results" style="display:none">
+          <div class="chart-card">
+            <div class="cc-head">
+              <span class="cc-title">Equity Curve</span>
+              <div style="display:flex;gap:8px;align-items:center">
+                <div class="cc-pills">
+                  <span class="cc-pill on" onclick="setScale('linear',this)">Linear</span>
+                  <span class="cc-pill" onclick="setScale('log',this)">Log</span>
+                </div>
+              </div>
+            </div>
+            <div class="chart-wrap"><canvas id="equity-chart" height="180"></canvas></div>
+          </div>
+          <div class="two-col">
+            <div class="chart-card">
+              <div class="cc-head"><span class="cc-title">Drawdown (Underwater Plot)</span></div>
+              <div class="chart-wrap"><canvas id="dd-chart" height="130"></canvas></div>
+            </div>
+            <div class="chart-card">
+              <div class="cc-head"><span class="cc-title">Rolling 12M Sharpe Ratio</span></div>
+              <div class="chart-wrap"><canvas id="sharpe-chart" height="130"></canvas></div>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="cc-head"><span class="cc-title">Annual Returns — Strategy vs Benchmark</span></div>
+            <div class="chart-wrap"><canvas id="annual-chart" height="140"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="cc-head"><span class="cc-title">Return Distribution</span></div>
+            <div class="chart-wrap"><canvas id="dist-chart" height="130"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Metrics panel -->
+      <div class="panel" id="panel-metrics">
+        <div class="two-col">
+          <div class="chart-card">
+            <div class="cc-head"><span class="cc-title">Risk-Adjusted Metrics</span></div>
+            <table class="stats-table" id="risk-adj-table"></table>
+          </div>
+          <div class="chart-card">
+            <div class="cc-head"><span class="cc-title">Portfolio Statistics</span></div>
+            <table class="stats-table" id="port-stats-table"></table>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="chart-card">
+            <div class="cc-head"><span class="cc-title">Return Metrics</span></div>
+            <table class="stats-table" id="ret-metrics-table"></table>
+          </div>
+          <div class="chart-card">
+            <div class="cc-head"><span class="cc-title">Drawdown Metrics</span></div>
+            <table class="stats-table" id="dd-metrics-table"></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Heatmap panel -->
+      <div class="panel" id="panel-heatmap">
+        <div class="chart-card">
+          <div class="cc-head"><span class="cc-title">Monthly Returns Heatmap</span>
+            <span style="font-family:var(--mono);font-size:9px;color:var(--muted)">Green = positive · Red = negative</span>
+          </div>
+          <div id="heatmap-container"></div>
+        </div>
+      </div>
+
+      <!-- Factor exposure panel -->
+      <div class="panel" id="panel-factor">
+        <div class="chart-card">
+          <div class="cc-head"><span class="cc-title">Rolling Market Beta (12-Month Window)</span></div>
+          <div class="chart-wrap"><canvas id="beta-chart" height="160"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="cc-head"><span class="cc-title">Factor Signal Summary</span></div>
+          <table class="stats-table" id="factor-summary-table"></table>
+        </div>
+      </div>
+
+      <!-- Trades panel -->
+      <div class="panel" id="panel-trades">
+        <div class="chart-card" style="padding:0;overflow:hidden">
+          <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+            <span class="cc-title">Trade Log</span>
+            <span id="trade-count" style="font-family:var(--mono);font-size:10px;color:var(--muted)"></span>
+          </div>
+          <div style="overflow-y:auto;max-height:calc(100vh - 280px)">
+            <table class="trade-table" id="trade-table">
+              <thead><tr>
+                <th>Date</th><th>Ticker</th><th>Action</th>
+                <th>Weight Old</th><th>Weight New</th><th>Price</th><th>Score</th>
+              </tr></thead>
+              <tbody id="trade-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /panels -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- Factor modal -->
+<div id="factor-modal">
+  <div class="modal-box">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div class="modal-title">Add Alpha Factor</div>
+      <button class="modal-close" onclick="closeFactorModal()">×</button>
+    </div>
+    <div class="modal-grid" id="factor-options"></div>
+  </div>
+</div>
+
+<!-- Loading overlay -->
+<div id="loading-overlay">
+  <div class="ld-text" id="ld-text">Initialising backtest engine…</div>
+  <div class="ld-bar"><div class="ld-fill"></div></div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────
+const API = '';  // same origin
+let FACTORS_META = [];
+let SECTORS_META = [];
+let CAPS_META    = [];
+let results      = null;
+let charts       = {};
+
+// Active factors in sidebar (Updated for Technicals)
+let activeFactor = [
+  { name: 'momentum_12m',   weight: 40, higher_is_better: true,  winsorize: true, zscore: true },
+  { name: 'momentum_6m',    weight: 30, higher_is_better: true,  winsorize: true, zscore: true },
+  { name: 'rsi_14',         weight: 15, higher_is_better: true,  winsorize: true, zscore: true },
+  { name: 'volatility_20d', weight: 15, higher_is_better: false, winsorize: true, zscore: true },
+];
+
+let activeSectors = null;
+let activeCaps    = null;
+
+// ─────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────
+async function init() {
+  try {
+    const r = await fetch(API + '/api/meta');
+    const d = await r.json();
+    FACTORS_META = d.factors;
+    SECTORS_META = d.sectors;
+    CAPS_META    = d.market_caps;
+    activeSectors = [...SECTORS_META];
+    activeCaps    = [...CAPS_META];
+    renderFactorList();
+    renderSectorTags();
+    renderCapTags();
+    renderFactorModalOptions();
+  } catch(e) {
+    console.error('Meta load failed', e);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Page navigation
+// ─────────────────────────────────────────────
+function showPage(p) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  const sbSections = {
+    strategy: ['sb-strategy'],
+    universe: ['sb-universe','sb-universe2'],
+    portfolio: ['sb-portfolio'],
+    risk: ['sb-risk'],
+  };
+  ['sb-strategy','sb-universe','sb-universe2','sb-portfolio','sb-risk'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  (sbSections[p] || []).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'block';
+  });
+}
+
+function showTab(t) {
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('panel-' + t).classList.add('active');
+}
+
+// ─────────────────────────────────────────────
+// Factor list
+// ─────────────────────────────────────────────
+function renderFactorList() {
+  const container = document.getElementById('factor-list');
+  container.innerHTML = '';
+  activeFactor.forEach((f, i) => {
+    const meta = FACTORS_META.find(m => m.col === f.name) || { label: f.name };
+    const div = document.createElement('div');
+    div.className = 'factor-card';
+    div.innerHTML = `
+      <div class="fc-top">
+        <span class="fc-name">${meta.label}</span>
+        <span class="fc-dir ${f.higher_is_better ? 'dir-long' : 'dir-short'}">${f.higher_is_better ? '↑ Long' : '↓ Short'}</span>
+      </div>
+      <div class="fc-weight-row">
+        <input type="range" min="5" max="100" value="${f.weight}"
+          oninput="updateFactorWeight(${i}, this.value)">
+        <span class="fc-weight-pct" id="fw-${i}">${f.weight}%</span>
+      </div>
+      <button class="fc-del" onclick="removeFactorAt(${i})" title="Remove">×</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function updateFactorWeight(i, v) {
+  activeFactor[i].weight = parseInt(v);
+  document.getElementById('fw-' + i).textContent = v + '%';
+}
+
+function removeFactorAt(i) {
+  activeFactor.splice(i, 1);
+  renderFactorList();
+}
+
+function openFactorModal() {
+  document.getElementById('factor-modal').classList.add('open');
+}
+
+function closeFactorModal() {
+  document.getElementById('factor-modal').classList.remove('open');
+}
+
+function renderFactorModalOptions() {
+  const grid = document.getElementById('factor-options');
+  grid.innerHTML = '';
+  FACTORS_META.forEach(f => {
+    const div = document.createElement('div');
+    div.className = 'factor-option';
+    div.innerHTML = `<div class="fo-name">${f.label}</div><div class="fo-dir">${f.higher_is_better ? '↑ Higher = better' : '↓ Lower = better'}</div>`;
+    div.onclick = () => {
+      if (!activeFactor.find(a => a.name === f.col)) {
+        activeFactor.push({ name: f.col, weight: 20, higher_is_better: f.higher_is_better, winsorize: true, zscore: true });
+        renderFactorList();
+      }
+      closeFactorModal();
+    };
+    grid.appendChild(div);
+  });
+}
+
+// ─────────────────────────────────────────────
+// Tags
+// ─────────────────────────────────────────────
+function renderSectorTags() {
+  const container = document.getElementById('sector-tags');
+  container.innerHTML = '';
+  SECTORS_META.forEach(s => {
+    const span = document.createElement('span');
+    span.className = 'tag on';
+    span.textContent = s.replace('Consumer ','Con. ').replace('Communication Services','Comm.');
+    span.title = s;
+    span.onclick = () => {
+      const idx = activeSectors.indexOf(s);
+      if (idx >= 0) { activeSectors.splice(idx, 1); span.classList.remove('on'); }
+      else { activeSectors.push(s); span.classList.add('on'); }
+    };
+    container.appendChild(span);
+  });
+}
+
+function renderCapTags() {
+  const container = document.getElementById('cap-tags');
+  container.innerHTML = '';
+  CAPS_META.forEach(c => {
+    const span = document.createElement('span');
+    span.className = 'tag on';
+    span.textContent = c;
+    span.onclick = () => {
+      const idx = activeCaps.indexOf(c);
+      if (idx >= 0) { activeCaps.splice(idx, 1); span.classList.remove('on'); }
+      else { activeCaps.push(c); span.classList.add('on'); }
+    };
+    container.appendChild(span);
+  });
+}
+
+// ─────────────────────────────────────────────
+// Run backtest
+// ─────────────────────────────────────────────
+async function runBacktest() {
+  if (!activeFactor.length) { alert('Add at least one factor.'); return; }
+
+  const btn = document.getElementById('run-btn');
+  btn.classList.add('loading');
+  btn.disabled = true;
+
+  const overlay = document.getElementById('loading-overlay');
+  overlay.classList.add('show');
+  const msgs = [
+    'Loading universe data…',
+    'Computing factor scores…',
+    'Running portfolio construction…',
+    'Simulating daily P&L…',
+    'Computing performance metrics…',
+  ];
+  let mi = 0;
+  const msgEl = document.getElementById('ld-text');
+  const msgInterval = setInterval(() => {
+    msgEl.textContent = msgs[Math.min(mi++, msgs.length - 1)];
+  }, 1200);
+
+  document.getElementById('status-badge').textContent = 'Running…';
+
+  const payload = {
+    start_date:     document.getElementById('start-date').value,
+    end_date:       document.getElementById('end-date').value,
+    custom_alpha:   document.getElementById('custom-alpha').value.trim() || null,
+    factors:        activeFactor.map(f => ({
+      name: f.name,
+      weight: f.weight / 100,
+      higher_is_better: f.higher_is_better,
+      winsorize: f.winsorize,
+      zscore: f.zscore,
+    })),
+    sectors:        activeSectors.length < SECTORS_META.length ? activeSectors : null,
+    market_caps:    activeCaps.length < CAPS_META.length ? activeCaps : null,
+    min_adv:        parseFloat(document.getElementById('min-adv').value) || 0,
+    max_positions:  parseInt(document.getElementById('max-pos').value),
+    max_weight:     parseFloat(document.getElementById('max-wt').value) / 100,
+    weighting:      document.getElementById('weighting').value,
+    long_short:     document.getElementById('long-short').checked,
+    rebalance_freq: document.getElementById('rebal-freq').value,
+    slippage_bps:   parseFloat(document.getElementById('slippage').value),
+    commission_bps: parseFloat(document.getElementById('commission').value),
+    max_drawdown_stop: parseFloat(document.getElementById('max-dd-stop').value) / 100,
+    benchmark:      'SP500',
+  };
+
+  try {
+    const resp = await fetch(API + '/api/backtest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    results = await resp.json();
+    renderResults(results);
+    document.getElementById('status-badge').textContent = `Done · ${results.elapsed_s}s`;
+  } catch(e) {
+    document.getElementById('status-badge').textContent = 'Error';
+    alert('Backtest failed: ' + e.message);
+  } finally {
+    clearInterval(msgInterval);
+    overlay.classList.remove('show');
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+}
+
+// ─────────────────────────────────────────────
+// Render results
+// ─────────────────────────────────────────────
+function renderResults(r) {
+  const m = r.metrics;
+
+  // Metric bar
+  setMetric('m-cagr',   pct(m.cagr),    m.cagr >= 0);
+  setMetric('m-sharpe', fmt(m.sharpe),   m.sharpe >= 1, false, true);
+  setMetric('m-sortino',fmt(m.sortino),  m.sortino >= 1, false, true);
+  setMetric('m-mdd',    pct(m.max_drawdown), false, m.max_drawdown < 0);
+  setMetric('m-alpha',  pct(m.alpha),    m.alpha >= 0);
+  setMetric('m-beta',   fmt(m.beta),     false, false, true);
+  setMetric('m-vol',    pct(m.ann_vol),  false, false, true);
+
+  document.getElementById('no-results').style.display  = 'none';
+  document.getElementById('chart-results').style.display = 'block';
+
+  drawEquityChart(r);
+  drawDDChart(r);
+  drawRollingSharpChart(r);
+  drawAnnualChart(r);
+  drawDistChart(r);
+  drawBetaChart(r);
+  renderHeatmap(r);
+  renderMetricsTables(r);
+  renderTradeLog(r);
+  renderFactorSummary(r);
+}
+
+function setMetric(id, val, isPos, isNeg, isNeu) {
+  const el = document.getElementById(id);
+  el.textContent = val;
+  el.className = 'mv ' + (isNeu ? 'neu' : isPos ? 'pos' : isNeg ? 'neg' : 'neu');
+}
+
+function pct(v) { return (v >= 0 ? '+' : '') + (v * 100).toFixed(1) + '%'; }
+function fmt(v) { return v.toFixed(2); }
+function fmtPct(v) { return (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%'; }
+
+// ─────────────────────────────────────────────
+// Charts
+// ─────────────────────────────────────────────
+const chartDefaults = {
+  responsive: true,
+  maintainAspectRatio: false,
+  animation: { duration: 600 },
+  plugins: { legend: { display: false }, tooltip: {
+    backgroundColor: '#181b1f',
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    titleFont: { family: "'DM Mono', monospace", size: 10 },
+    bodyFont:  { family: "'DM Mono', monospace", size: 10 },
+    titleColor: '#7a7870',
+    bodyColor:  '#e8e6e0',
+  }},
+  scales: {
+    x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#7a7870', font: { family: "'DM Mono'", size: 9 }, maxTicksLimit: 8 } },
+    y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#7a7870', font: { family: "'DM Mono'", size: 9 }, maxTicksLimit: 6 } },
+  },
+};
+
+function sparseLabels(labels, max = 12) {
+  const step = Math.max(1, Math.floor(labels.length / max));
+  return labels.map((l, i) => i % step === 0 ? l.slice(0, 7) : '');
+}
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+function drawEquityChart(r) {
+  destroyChart('equity');
+  const labels = Object.keys(r.equity_curve);
+  const strat  = Object.values(r.equity_curve);
+  const bench  = labels.map(d => r.benchmark_curve[d] || null);
+
+  const ctx = document.getElementById('equity-chart').getContext('2d');
+  const gradS = ctx.createLinearGradient(0, 0, 0, 250);
+  gradS.addColorStop(0, 'rgba(200,240,96,0.18)');
+  gradS.addColorStop(1, 'rgba(200,240,96,0)');
+  const gradB = ctx.createLinearGradient(0, 0, 0, 250);
+  gradB.addColorStop(0, 'rgba(96,200,240,0.1)');
+  gradB.addColorStop(1, 'rgba(96,200,240,0)');
+
+  charts['equity'] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: sparseLabels(labels),
+      datasets: [
+        { label: 'Strategy', data: strat, borderColor: '#c8f060', borderWidth: 1.8,
+          backgroundColor: gradS, fill: true, pointRadius: 0, tension: 0.1 },
+        { label: 'Benchmark', data: bench, borderColor: '#60c8f0', borderWidth: 1.2,
+          backgroundColor: gradB, fill: true, pointRadius: 0, tension: 0.1,
+          borderDash: [4, 3] },
+      ],
+    },
+    options: {
+      ...chartDefaults,
+      maintainAspectRatio: false,
+      plugins: { ...chartDefaults.plugins, legend: { display: true, labels: {
+        color: '#7a7870', font: { family: "'DM Mono'", size: 9 }, boxWidth: 12,
+      }}},
+      scales: {
+        x: { ...chartDefaults.scales.x },
+        y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks,
+          callback: v => '$' + v.toFixed(2) } },
+      },
+    },
+  });
+}
+
+function drawDDChart(r) {
+  destroyChart('dd');
+  const labels = Object.keys(r.drawdown_series);
+  const vals   = Object.values(r.drawdown_series);
+  const ctx    = document.getElementById('dd-chart').getContext('2d');
+  const grad   = ctx.createLinearGradient(0, 0, 0, 180);
+  grad.addColorStop(0, 'rgba(240,96,96,0)');
+  grad.addColorStop(1, 'rgba(240,96,96,0.25)');
+
+  charts['dd'] = new Chart(ctx, {
+    type: 'line',
+    data: { labels: sparseLabels(labels), datasets: [{
+      data: vals, borderColor: '#f06060', borderWidth: 1.4,
+      backgroundColor: grad, fill: true, pointRadius: 0, tension: 0.1,
+    }]},
+    options: { ...chartDefaults, maintainAspectRatio: false,
+      scales: { x: chartDefaults.scales.x, y: { ...chartDefaults.scales.y,
+        ticks: { ...chartDefaults.scales.y.ticks, callback: v => (v*100).toFixed(1)+'%' }
+      }},
+    },
+  });
+}
+
+function drawRollingSharpChart(r) {
+  destroyChart('rs');
+  const labels = Object.keys(r.rolling_sharpe);
+  const vals   = Object.values(r.rolling_sharpe);
+  const ctx    = document.getElementById('sharpe-chart').getContext('2d');
+  charts['rs'] = new Chart(ctx, {
+    type: 'line',
+    data: { labels: sparseLabels(labels), datasets: [{
+      data: vals, borderColor: '#c8f060', borderWidth: 1.5,
+      backgroundColor: 'rgba(200,240,96,0.06)', fill: true, pointRadius: 0, tension: 0.2,
+    }]},
+    options: { ...chartDefaults, maintainAspectRatio: false,
+      scales: { x: chartDefaults.scales.x, y: chartDefaults.scales.y },
+    },
+  });
+}
+
+function drawAnnualChart(r) {
+  destroyChart('annual');
+  const ann  = r.annual_returns;
+  const years = Object.keys(ann).sort();
+  const strat = years.map(y => +(ann[y] * 100).toFixed(2));
+
+  // Build benchmark annual from benchmark_curve
+  const benchMonthly = {};
+  Object.entries(r.benchmark_curve).forEach(([d, v]) => {
+    const y = d.slice(0, 4);
+    benchMonthly[y] = v;
+  });
+  const benchStart = {};
+  Object.entries(r.benchmark_curve).forEach(([d, v]) => {
+    const y = d.slice(0, 4);
+    if (!benchStart[y]) benchStart[y] = v;
+  });
+  const benchAnn = years.map(y => {
+    const keys = Object.keys(r.benchmark_curve).filter(d => d.startsWith(y));
+    if (!keys.length) return 0;
+    const first = r.benchmark_curve[keys[0]];
+    const last  = r.benchmark_curve[keys[keys.length - 1]];
+    return +((last / first - 1) * 100).toFixed(2);
+  });
+
+  const ctx = document.getElementById('annual-chart').getContext('2d');
+  charts['annual'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: years,
+      datasets: [
+        { label: 'Strategy', data: strat, backgroundColor: strat.map(v => v >= 0 ? 'rgba(200,240,96,0.7)' : 'rgba(240,96,96,0.7)'), borderRadius: 3 },
+        { label: 'Benchmark', data: benchAnn, backgroundColor: benchAnn.map(v => v >= 0 ? 'rgba(96,200,240,0.45)' : 'rgba(240,150,96,0.45)'), borderRadius: 3 },
+      ],
+    },
+    options: { ...chartDefaults, maintainAspectRatio: false,
+      plugins: { ...chartDefaults.plugins, legend: { display: true, labels: { color: '#7a7870', font: { family: "'DM Mono'", size: 9 }, boxWidth: 12 } } },
+      scales: { x: chartDefaults.scales.x, y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => v + '%' } } },
+    },
+  });
+}
+
+function drawDistChart(r) {
+  destroyChart('dist');
+  // Get daily returns from equity curve
+  const vals = Object.values(r.equity_curve);
+  const rets = [];
+  for (let i = 1; i < vals.length; i++) rets.push((vals[i] / vals[i-1] - 1) * 100);
+
+  const bins = 50;
+  const min = Math.min(...rets), max = Math.max(...rets);
+  const step = (max - min) / bins;
+  const counts = new Array(bins).fill(0);
+  const binLabels = [];
+  for (let i = 0; i < bins; i++) binLabels.push((min + i * step).toFixed(2));
+  rets.forEach(v => {
+    const b = Math.min(Math.floor((v - min) / step), bins - 1);
+    counts[b]++;
+  });
+
+  const ctx = document.getElementById('dist-chart').getContext('2d');
+  charts['dist'] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: binLabels, datasets: [{
+      data: counts,
+      backgroundColor: binLabels.map(l => parseFloat(l) >= 0 ? 'rgba(200,240,96,0.55)' : 'rgba(240,96,96,0.55)'),
+      borderWidth: 0, borderRadius: 2,
+    }]},
+    options: { ...chartDefaults, maintainAspectRatio: false,
+      scales: { x: { ...chartDefaults.scales.x, ticks: { ...chartDefaults.scales.x.ticks, maxTicksLimit: 10, callback: v => binLabels[v] + '%' } },
+        y: { ...chartDefaults.scales.y, ticks: { ...chartDefaults.scales.y.ticks, callback: v => v } }
+      },
+    },
+  });
+}
+
+function drawBetaChart(r) {
+  destroyChart('beta');
+  const fe = r.factor_exposure;
+  if (!fe || !fe.dates) return;
+  const ctx = document.getElementById('beta-chart').getContext('2d');
+  charts['beta'] = new Chart(ctx, {
+    type: 'line',
+    data: { labels: fe.dates.map(d => d.slice(0, 7)), datasets: [{
+      label: 'Rolling Beta', data: fe.market_beta,
+      borderColor: '#f0b860', borderWidth: 1.6,
+      backgroundColor: 'rgba(240,184,96,0.08)', fill: true, pointRadius: 0, tension: 0.3,
+    }]},
+    options: { ...chartDefaults, maintainAspectRatio: false,
+      scales: { x: chartDefaults.scales.x, y: { ...chartDefaults.scales.y,
+        ticks: { ...chartDefaults.scales.y.ticks, callback: v => 'β ' + v.toFixed(2) }
+      }},
+    },
+  });
+}
+
+function setScale(type, el) {
+  el.closest('.cc-pills').querySelectorAll('.cc-pill').forEach(p => p.classList.remove('on'));
+  el.classList.add('on');
+  if (charts['equity']) {
+    charts['equity'].options.scales.y.type = type;
+    charts['equity'].update();
+  }
+}
+
+// ─────────────────────────────────────────────
+// Heatmap
+// ─────────────────────────────────────────────
+function renderHeatmap(r) {
+  const monthly = r.monthly_returns;
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // Group by year
+  const byYear = {};
+  Object.entries(monthly).forEach(([d, v]) => {
+    const [y, m] = d.split('-');
+    if (!byYear[y]) byYear[y] = {};
+    byYear[y][parseInt(m) - 1] = v;
+  });
+  const years = Object.keys(byYear).sort();
+  const allVals = Object.values(monthly);
+  const maxAbs = Math.max(...allVals.map(v => Math.abs(v)));
+
+  const container = document.getElementById('heatmap-container');
+  container.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.className = 'heatmap';
+
+  // Header row
+  const hdr = document.createElement('div');
+  hdr.className = 'hm-row';
+  hdr.innerHTML = '<div class="hm-year"></div>';
+  MONTHS.forEach(m => {
+    const c = document.createElement('div');
+    c.className = 'hm-mon-label';
+    c.textContent = m.slice(0, 1);
+    hdr.appendChild(c);
+  });
+  grid.appendChild(hdr);
+
+  years.forEach(y => {
+    const row = document.createElement('div');
+    row.className = 'hm-row';
+    const yl = document.createElement('div');
+    yl.className = 'hm-year';
+    yl.textContent = y;
+    row.appendChild(yl);
+
+    for (let mi = 0; mi < 12; mi++) {
+      const v = byYear[y][mi];
+      const cell = document.createElement('div');
+      cell.className = 'hm-cell';
+      if (v !== undefined) {
+        const intensity = Math.min(Math.abs(v) / maxAbs, 1);
+        if (v >= 0) {
+          const g = Math.round(80 + intensity * 160);
+          cell.style.background = `rgb(${Math.round(20-intensity*10)},${g},${Math.round(30+intensity*20)})`;
+          cell.style.color = intensity > 0.5 ? '#0a1a0a' : '#4a9a4a';
+        } else {
+          const r2 = Math.round(80 + intensity * 160);
+          cell.style.background = `rgb(${r2},${Math.round(20-intensity*10)},${Math.round(20-intensity*10)})`;
+          cell.style.color = intensity > 0.5 ? '#1a0a0a' : '#9a4a4a';
+        }
+        cell.textContent = (v * 100).toFixed(1);
+        cell.title = MONTHS[mi] + ' ' + y + ': ' + fmtPct(v);
+      } else {
+        cell.style.background = 'var(--surface2)';
+      }
+      row.appendChild(cell);
+    }
+    grid.appendChild(row);
+  });
+
+  container.appendChild(grid);
+}
+
+// ─────────────────────────────────────────────
+// Metrics tables
+// ─────────────────────────────────────────────
+function renderMetricsTables(r) {
+  const m = r.metrics;
+
+  fillTable('risk-adj-table', [
+    ['Sharpe ratio',     fmt(m.sharpe),      m.sharpe >= 1],
+    ['Sortino ratio',    fmt(m.sortino),     m.sortino >= 1],
+    ['Calmar ratio',     fmt(m.calmar),      m.calmar >= 1],
+    ['Omega ratio',      fmt(m.omega),       m.omega >= 1.5],
+    ['Information ratio',fmt(m.information_ratio), m.information_ratio >= 0.5],
+    ['Treynor ratio',    fmt(m.treynor),     m.treynor >= 0.1],
+    ['VaR 95% (daily)',  pct(m.var_95),      false, true],
+    ['CVaR 95% (daily)', pct(m.cvar_95),     false, true],
+  ]);
+
+  fillTable('port-stats-table', [
+    ['Beta',             fmt(m.beta),        false, false],
+    ['Alpha (ann.)',     pct(m.alpha),       m.alpha >= 0],
+    ['Ann. volatility',  pct(m.ann_vol),     false, false],
+    ['Tracking error',   pct(m.ann_vol * 0.8), false, false],
+    ['Active share',     pct(m.active_share), m.active_share > 0.5],
+    ['Avg turnover',     pct(m.avg_turnover), false, false],
+    ['Total trades',     r.n_trades,         false, false],
+  ]);
+
+  fillTable('ret-metrics-table', [
+    ['Total return',     pct(m.total_return),  m.total_return >= 0],
+    ['CAGR',             pct(m.cagr),          m.cagr >= 0],
+    ['Best year',        m.best_year  !== undefined ? pct(m.best_year)  : '—', true],
+    ['Worst year',       m.worst_year !== undefined ? pct(m.worst_year) : '—', false, m.worst_year < 0],
+  ]);
+
+  fillTable('dd-metrics-table', [
+    ['Max drawdown',      pct(m.max_drawdown),   false, true],
+    ['Recovery (months)', m.recovery_months ?? 'N/A', false, false],
+    ['VaR 99% (daily)',   pct(m.var_95 * 1.4),  false, true],
+    ['CVaR 99% (daily)',  pct(m.cvar_95 * 1.3), false, true],
+  ]);
+}
+
+function fillTable(id, rows) {
+  const tb = document.getElementById(id);
+  tb.innerHTML = rows.map(([k, v, isPos, isNeg]) => `
+    <tr>
+      <td class="sk">${k}</td>
+      <td class="sv ${isPos ? 'pos' : isNeg ? 'neg' : 'neu'}">${v}</td>
+    </tr>
+  `).join('');
+}
+
+// ─────────────────────────────────────────────
+// Trade log
+// ─────────────────────────────────────────────
+function renderTradeLog(r) {
+  document.getElementById('trade-count').textContent =
+    `Showing last ${r.trade_log.length} of ${r.n_trades} trades`;
+  const tbody = document.getElementById('trade-tbody');
+  tbody.innerHTML = r.trade_log.map(t => `
+    <tr>
+      <td>${t.date}</td>
+      <td style="color:var(--accent2)">${t.ticker}</td>
+      <td><span class="${t.action === 'BUY' ? 'pill-buy' : 'pill-sell'}">${t.action}</span></td>
+      <td>${(t.weight_old * 100).toFixed(2)}%</td>
+      <td>${(t.weight_new * 100).toFixed(2)}%</td>
+      <td>$${t.price.toFixed(2)}</td>
+      <td style="color:var(--muted)">${t.score.toFixed(3)}</td>
+    </tr>
+  `).join('');
+}
+
+// ─────────────────────────────────────────────
+// Factor summary
+// ─────────────────────────────────────────────
+function renderFactorSummary(r) {
+  const customAlpha = document.getElementById('custom-alpha').value.trim();
+  const tb = document.getElementById('factor-summary-table');
+  
+  if (customAlpha) {
+    // Show the custom formula in the table if one was used
+    tb.innerHTML = `<tr><td class="sk" style="padding:10px;">Using Custom Formula:</td><td class="sv pos" style="text-align:right">${customAlpha}</td></tr>`;
+    return;
+  }
+
+  // Otherwise, show the standard factor weights
+  const rows = activeFactor.map(f => {
+    const meta = FACTORS_META.find(m => m.col === f.name) || { label: f.name };
+    const pct_w = ((f.weight / activeFactor.reduce((s, a) => s + a.weight, 0)) * 100).toFixed(1);
+    return [meta.label, pct_w + '%', f.higher_is_better ? 'Long' : 'Short', f.zscore ? 'Yes' : 'No', f.winsorize ? 'Yes' : 'No'];
+  });
+  
+  tb.innerHTML = `<tr style="border-bottom:1px solid var(--border)">
+    <th class="sk" style="padding:4px 0;font-size:9px;font-family:var(--mono)">Factor</th>
+    <th class="sk" style="padding:4px 0;font-size:9px;text-align:right;font-family:var(--mono)">Weight</th>
+    <th class="sk" style="padding:4px 0;font-size:9px;text-align:right;font-family:var(--mono)">Direction</th>
+    <th class="sk" style="padding:4px 0;font-size:9px;text-align:right;font-family:var(--mono)">Z-score</th>
+    <th class="sk" style="padding:4px 0;font-size:9px;text-align:right;font-family:var(--mono)">Winsorize</th>
+  </tr>` + rows.map(r2 => `<tr>
+    <td class="sk">${r2[0]}</td>
+    <td class="sv pos" style="text-align:right">${r2[1]}</td>
+    <td class="sv ${r2[2]==='Long'?'pos':'neg'}" style="text-align:right">${r2[2]}</td>
+    <td class="sv neu" style="text-align:right">${r2[3]}</td>
+    <td class="sv neu" style="text-align:right">${r2[4]}</td>
+  </tr>`).join('');
+}
+// ─────────────────────────────────────────────
+// UI Logic
+// ─────────────────────────────────────────────
+function toggleFactorState() {
+  const customAlpha = document.getElementById('custom-alpha').value.trim();
+  const factorWrapper = document.getElementById('factor-ui-wrapper');
+  
+  if (customAlpha.length > 0) {
+    // If user is typing a custom formula, grey out the standard factors
+    factorWrapper.classList.add('factors-disabled');
+  } else {
+    // If the box is empty, re-enable the standard factors
+    factorWrapper.classList.remove('factors-disabled');
+  }
+}
+// ─────────────────────────────────────────────
+// Boot
+// ─────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
