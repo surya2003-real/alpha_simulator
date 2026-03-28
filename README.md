@@ -99,3 +99,4 @@ alphasim/
   "max_drawdown_stop": 0.20
 }
 ```
+![Alpha Simulator Image](image.png)
